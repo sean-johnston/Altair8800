@@ -103,6 +103,7 @@ struct prog_info_struct get_prog_info(byte i)
   return programs[i];
 }
 
+byte menu = 0;
 
 uint16_t prog_print_dir()
 {
@@ -111,15 +112,21 @@ uint16_t prog_print_dir()
   Serial.println();
   while( get_prog_info(i).name!=NULL )
     {
-      numsys_print_byte_bin(i);
+      if (!menu)
+        numsys_print_byte_bin(i);
+      else
+        numsys_print_byte_hex(i);
       Serial.print(F(") "));
       Serial.println(FP(get_prog_info(i).name));
       i++;
     }
 
-  Serial.println(F("01xxxxxx) [Read Intel HEX data from primary host interface]"));
-  Serial.println(F("10nnnnnn) [load memory page, nnnnnn=file number]"));
-  Serial.println(F("11nnnnnn) [save memory page, nnnnnn=file number]"));
+  if (menu == 0) {
+    Serial.println(F("01xxxxxx) [Read Intel HEX data from primary host interface]"));
+    Serial.println(F("10nnnnnn) [load memory page, nnnnnn=file number]"));
+    Serial.println(F("11nnnnnn) [save memory page, nnnnnn=file number]"));
+  }
+  menu = 0;
   return 0;
 }
 

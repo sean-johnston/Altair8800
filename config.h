@@ -11,7 +11,7 @@
 // 0 = use Intel 8080
 // 1 = use Zilog Z80  (uses 20 bytes more RAM than i8080)
 // 2 = allow switching between i8080 and z80 via configuration (uses more RAM and flash memory)
-#define USE_Z80 0
+#define USE_Z80 2
 
 
 // If this is set to 1 and the host provides a file system (i.e. an SD card is connected)
@@ -51,12 +51,12 @@
 
 // Enables support for Cromemco disk drives (maximum 4).
 // Set to 0 to disable Cromemco drive support.
-#define NUM_CDRIVES 0
+#define NUM_CDRIVES 4
 
 
 // Enables support for Tarbell disk drives (maximum 4).
 // Set to 0 to completely disable Tarbell drive support.
-#define NUM_TDRIVES 0
+#define NUM_TDRIVES 4
 
 
 // Enables support for hard disk (88-HDSK). Hard disk support uses
@@ -120,7 +120,7 @@
 // If enabled, Address switch state will be set by issuing the '/'
 // serial command.  Actual switches will be ignored.
 // Useful when operating while not connected to the front panel hardware.
-#define STANDALONE 0
+#define STANDALONE 1
 
 
 

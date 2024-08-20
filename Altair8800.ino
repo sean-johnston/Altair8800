@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------
 // Altair 8800 Simulator
 // Copyright (C) 2017 David Hansel
 //
@@ -152,7 +152,7 @@ byte get_device(byte switches)
 
 
 void process_inputs()
-{  
+{
   if( cswitch & BIT(SW_DEPOSIT) )
     {
       MWRITE(regPC, dswitch&0xff);
@@ -185,7 +185,7 @@ void process_inputs()
         {
           // SW7 is up => memory page operation
           host_set_status_led_HLDA();
-          
+
           uint16_t page = dswitch & 0xff00;
           byte filenum  = dswitch & 0x003f;
           if( dswitch & 0x40 )
@@ -208,10 +208,10 @@ void process_inputs()
                 }
               else
                 DBG_FILEOPS4(2, F("file not found loading memory page "), b2s(page>>8), F(" from file #"), b2s(filenum));
-                
+
               altair_set_outputs(regPC, MREAD(regPC));
             }
-            
+
           serial_update_hlda_led();
         }
       else if (dswitch & 0x40 )
@@ -220,7 +220,7 @@ void process_inputs()
           int status = altair_read_intel_hex();
           Serial.println();
           altair_print_intel_hex_status(status);
-          
+
           // skip any remaining input
           empty_input_buffer();
         }
@@ -249,7 +249,7 @@ void process_inputs()
           // STOP is up => edit configuration
           config_edit();
           if( config_serial_panel_enabled() ) 
-            { 
+            {
               Serial.print(F("\033[14B")); 
               print_panel_serial(true); 
             }
@@ -315,7 +315,7 @@ void process_inputs()
 	{
 	  if( (dswitch & 0xff)==0 )
 	    drive_dir();
-	  else 
+	  else
             {
               const char *desc = drive_get_image_description(dswitch&0xff);
               if( drive_mount((dswitch >> 8) & 0x0f, dswitch & 0xff) )
@@ -355,7 +355,7 @@ void process_inputs()
 	{
 	  if( (dswitch & 0xff)==0 )
 	    tdrive_dir();
-	  else 
+	  else
             {
 	      const char *desc = tdrive_get_image_description(dswitch&0xff);
               if( tdrive_mount((dswitch >> 8) & 0x03, dswitch & 0xff) )
@@ -375,7 +375,7 @@ void process_inputs()
 	{
 	  if( (dswitch & 0xff)==0 )
 	    hdsk_dir();
-	  else 
+	  else
             {
               char buf[50];
               byte unit    = (dswitch >> 10) & 0x03;
@@ -747,6 +747,8 @@ void empty_input_buffer()
     { if( serial_read()<0 ) { delay(15); if( serial_read()<0 ) { delay(150); if( serial_read()<0 ) break; } } }
 }
 
+uint16_t prog_print_dir();
+extern byte menu;
 
 void read_inputs_serial()
 {
@@ -790,6 +792,20 @@ void read_inputs_serial()
     cswitch |= BIT(SW_AUX1UP);
   else if( data == 'u' )
     cswitch |= BIT(SW_AUX1DOWN);
+  else if( data == 'W' )
+    cswitch |= BIT(SW_AUX2UP);
+  else if( data == 'w' )
+    cswitch |= BIT(SW_AUX2DOWN);
+
+  else if( data == '?') {
+    menu = 1;
+    Serial.print(F("\033[2J"));
+    prog_print_dir();
+    Serial.print(F("\r\nOption: "));
+    cswitch = BIT(SW_AUX1DOWN);
+    numsys_read_word(&dswitch);
+    Serial.print(F("\r\n"));
+  }
   else if( data == '>' )
     {
       Serial.print(F("\r\nRun from address: "));
@@ -940,8 +956,8 @@ void read_inputs_serial()
               do { c=serial_read(); } while( (c<'1' || c>'0'+NUM_HDSK_UNITS) && c!=27);
               if( c!=27 ) { Serial.print(c); Serial.print(' '); }
 #endif
-              if( c!=27 ) 
-                { 
+              if( c!=27 )
+                {
                   dswitch = 0x3000 | ((c-'1') << 10);
 
                   Serial.print(F("Platter number (0-3): "));
@@ -951,7 +967,7 @@ void read_inputs_serial()
                 }
             }
 #endif
-          
+
           if( ok )
             {
               byte b;
@@ -1169,7 +1185,8 @@ void print_panel_serial(bool force)
       if( abus&0x0004 ) Serial.print(F("   *")); else Serial.print(F("   ."));
       if( abus&0x0002 ) Serial.print(F("   *")); else Serial.print(F("   ."));
       if( abus&0x0001 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      Serial.print(F("\r\n            S15 S14 S13 S12 S11 S10  S9  S8  S7  S6  S5  S4  S3  S2  S1  S0\r\n"));
+      Serial.print(F("\r\n            S15 S14 S13 S12 S11 S10 S09 S08 S07 S06 S05 S04 S03 S02 S01 S00"));
+      Serial.print(F("\r\n            (f) (e) (d) (c) (b) (a) (9) (8) (7) (6) (5) (4) (3) (2) (1) (0)\r\n"));
       Serial.print(F("          "));
       if( dswitch&0x8000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
       if( dswitch&0x4000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
@@ -1348,8 +1365,8 @@ void altair_vi_out_control(byte port, byte data)
 {
   // set current interrupt level for vector interrupts
   altair_vi_level_cur = (data & 8)==0 ? 0xff : (7-(data&7));
-  
-  // reset interrupt line from RTC 
+
+  // reset interrupt line from RTC
   if( data & 0x10 )
     altair_interrupt(INT_RTC, false);
 
@@ -1500,7 +1517,7 @@ void altair_hlt()
       while( (altair_interrupts & (~INT_SWITCH|INT_SW_RESET))==0 ) 
         { 
           // check host interrupts (e.g. switches on Mega)
-          host_check_interrupts(); 
+          host_check_interrupts();
 
           // advance simulation time (so timers can expire)
           TIMER_ADD_CYCLES(2);
@@ -1585,7 +1602,7 @@ void altair_out(byte port, byte data)
   // The data LEDs on the front panel are connected to
   // the "data in" lines. For output operations those
   // lines are in high-Z state and therefore the LEDs
-  // are all on regardless of the data. 
+  // are all on regardless of the data.
   // We simulate the original behavior here even though
   // we could just as well show the proper data.
   host_set_data_leds(0xff);
@@ -1605,7 +1622,7 @@ void altair_out(byte port, byte data)
 #endif
       altair_wait_step();
     }
-  
+
   host_clr_status_led_OUT();
 }
 
@@ -1619,21 +1636,21 @@ byte altair_in(byte port)
   if( host_read_status_led_WAIT() )
     {
       cswitch &= BIT(SW_RESET); // clear everything but RESET status
-      
+
       // keep reading input data while we are waiting
       while( host_read_status_led_WAIT() && (cswitch & (BIT(SW_STEP) | BIT(SW_SLOW) | BIT(SW_RESET)))==0 )
-        { 
+        {
           host_set_status_led_INP();
           data = io_inp(port);
           altair_set_outputs(port| port*256, data);
           host_clr_status_led_INP();
 
-          read_inputs(); 
+          read_inputs();
 
           // advance simulation time (so timers can expire)
           TIMER_ADD_CYCLES(50);
         }
-      
+
       if( cswitch & BIT(SW_SLOW) ) delay(500);
     }
   else
@@ -1647,7 +1664,7 @@ byte altair_in(byte port)
   return data;
 }
 
-void setup() 
+void setup()
 {
   cswitch = 0;
   dswitch = 0;
@@ -1743,7 +1760,7 @@ void setup()
 
 
 
-void loop() 
+void loop()
 {
   byte opcode;
 
@@ -1752,7 +1769,7 @@ void loop()
     {
       // clear all switch-related interrupts before starting loop
       altair_interrupts &= ~INT_SWITCH;
-      
+
       // enable/disable profiling
       profile_enable(config_profiling_enabled());
 
@@ -1870,7 +1887,7 @@ void loop()
     {
       PROFILE_COUNT_OPCODE(opcode);
       CPU_EXEC(opcode);
-      
+
       // if the PC has not changed (e.g. jump to the same address) then modify p_regPC 
       // to force debugger display (otherwise there would be no feedback)
       if( regPC == p_regPC ) p_regPC = ~regPC;
