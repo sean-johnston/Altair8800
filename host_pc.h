@@ -10,6 +10,8 @@
 #include "Altair8800.h"
 #ifdef _WIN32
 struct DIR;
+#elif defined(__bsd__)|| defined(__APPLE__)
+#include <dirent.h>
 #else
 typedef struct __dirstream DIR;
 #endif

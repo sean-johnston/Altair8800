@@ -13,7 +13,7 @@
 #include "host_mega.h"
 #elif defined(__SAM3X8E__)
 #include "host_due.h"
-#elif defined(_WIN32) || defined(__linux__)
+#elif defined(_WIN32) || defined(__linux__) || defined(__bsd__)|| defined(__APPLE__)
 #include "host_pc.h"
 #elif defined(__MK66FX1M0__)
 #include "host_teensy36.h"

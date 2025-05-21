@@ -40,6 +40,11 @@
 #include "vdm1.h"
 #include "io.h"
 
+#if defined(__APPLE__) || defined(__bsd__)
+#include <ncurses.h>
+#endif
+
+
 #define BIT(n) (1<<(n))
 #define b2s numsys_byte2string
 
@@ -788,8 +793,15 @@ void read_inputs_serial()
     cswitch |= BIT(SW_RESET);
   else if( data == '!' )
     cswitch |= BIT(SW_RESET) | BIT(SW_STOP);
-  else if( data == 'U' )
+  else if( data == 'U' ) {
     cswitch |= BIT(SW_AUX1UP);
+
+    // Scroll up to not have text over 
+    // old output
+    for (int i = 0; i < 22; i++) {
+      Serial.print(F("\r\n"));
+    }
+  }
   else if( data == 'u' )
     cswitch |= BIT(SW_AUX1DOWN);
   else if( data == 'W' )
@@ -797,14 +809,25 @@ void read_inputs_serial()
   else if( data == 'w' )
     cswitch |= BIT(SW_AUX2DOWN);
 
+  // This allows you to select from a menu instead of having to set
+  // the switches and switch AUX1 down
   else if( data == '?') {
+
+    // Display the programs menu
     menu = 1;
     Serial.print(F("\033[2J"));
     prog_print_dir();
     Serial.print(F("\r\nOption: "));
+
+    // Set switches to program based on the selection
     cswitch = BIT(SW_AUX1DOWN);
     numsys_read_word(&dswitch);
-    Serial.print(F("\r\n"));
+
+    // Scroll up to not have text over 
+    // old output
+    for (int i = 0; i < 22; i++) {
+      Serial.print(F("\r\n"));
+    }
   }
   else if( data == '>' )
     {
