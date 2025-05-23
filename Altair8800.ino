@@ -818,7 +818,6 @@ void read_inputs_serial()
 
     // Display the programs menu
     menu = 1;
-    Serial.print(F("\033[2J"));
     prog_print_dir();
     Serial.print(F("\r\nOption: "));
 
@@ -826,11 +825,7 @@ void read_inputs_serial()
     cswitch = BIT(SW_AUX1DOWN);
     numsys_read_word(&dswitch);
 
-    // Scroll up to not have text over 
-    // old output
-    for (int i = 0; i < 22; i++) {
-      Serial.print(F("\r\n"));
-    }
+    Serial.print(F("\033[2J\033[0;0H\n"));
   }
   else if (data == '~' && delete_value != 0) {
 
@@ -845,6 +840,10 @@ void read_inputs_serial()
       delete_value = 8;
       strcpy(delete_str, "(BS)");
     }
+    print_panel_serial(true);
+  }
+  else if( data == ' ')
+  {
     print_panel_serial(true);
   }
   else if( data == '>' )
@@ -1186,7 +1185,7 @@ void print_panel_serial(bool force)
 
   if( force || p_cswitch != cswitch || p_dswitch != dswitch || p_abus != abus || p_dbus != dbus || p_status != status )
     {
-      Serial.print(F("\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
+      Serial.print(F("\033[2J\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
 
       if( status & ST_INTE  ) Serial.print(F(" *  "));    else Serial.print(F(" .  "));
       if( status & ST_PROT  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
