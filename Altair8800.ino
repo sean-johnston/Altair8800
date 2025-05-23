@@ -44,6 +44,9 @@
 #include <ncurses.h>
 #endif
 
+// Values for when the backspace character is pressed
+char delete_str[20]; // String displayed
+char delete_value; // Value used
 
 #define BIT(n) (1<<(n))
 #define b2s numsys_byte2string
@@ -829,6 +832,21 @@ void read_inputs_serial()
       Serial.print(F("\r\n"));
     }
   }
+  else if (data == '~' && delete_value != 0) {
+
+    // Toggled between delete and BS for the backspace key
+    if (delete_value == 8) {
+      // Use delete
+      delete_value = 127;
+      strcpy(delete_str, "(DEL)");
+    }
+    else {
+      // Use backspace
+      delete_value = 8;
+      strcpy(delete_str, "(BS)");
+    }
+    print_panel_serial(true);
+  }
   else if( data == '>' )
     {
       Serial.print(F("\r\nRun from address: "));
@@ -1227,7 +1245,12 @@ void print_panel_serial(bool force)
       if( dswitch&0x0004 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
       if( dswitch&0x0002 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
       if( dswitch&0x0001 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      Serial.print(F("\r\n            Stop  Step  Examine  Deposit  Reset  Protect   Aux  Aux\r\n"));
+      Serial.print(F("\r\n            Stop  Step  Examine  Deposit  Reset  Protect   Aux  Aux   "));
+
+      // Show the delete value for the backspace
+      Serial.print(F(delete_str));
+
+      Serial.print(F("   \r\n"));
       Serial.print(F("           "));
       if( cswitch & BIT(SW_STOP) )    Serial.print(F("  ^ "));       else if( cswitch & BIT(SW_RUN) )       Serial.print(F("  v "));      else Serial.print(F("  o "));
       if( cswitch & BIT(SW_STEP) )    Serial.print(F("    ^ "));     else if( cswitch & BIT(SW_SLOW) )      Serial.print(F("    v "));    else Serial.print(F("    o "));
@@ -1689,6 +1712,17 @@ byte altair_in(byte port)
 
 void setup()
 {
+
+#if defined(_WIN32) || defined(__linux__) || defined(__FreeBSD__)|| defined(__APPLE__)
+  // Enable delete string
+  strcpy(delete_str, "(BS)");
+  delete_value = 8;
+#else
+  // Disble delete string
+  strcpy(delete_str, "");
+  delete_value = 0;
+#endif
+
   cswitch = 0;
   dswitch = 0;
 

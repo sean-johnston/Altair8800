@@ -70,6 +70,9 @@ static unsigned long long int signal_write_buf = 1;
 
 #include <Arduino.h>
 
+// Value to use when the backspace key is pressed
+extern char delete_value;
+
 byte data_leds;
 uint16_t status_leds;
 uint16_t addr_leds;
@@ -521,6 +524,8 @@ DWORD WINAPI host_input_thread(void *data)
                 {
                   // we received some console input (reading it resets the event)
                   inp_serial[0] = Serial.read();
+                  // Translate to the correct character delete value when the backspace key is pressed
+                  if (inp_serial[0] == 8) inp_serial[0] = delete_value;
                 }
               else
                 {
@@ -674,11 +679,8 @@ void *host_input_thread(void *data)
           if( FD_ISSET(fileno(stdin), &s_rd) )
 	    inp_serial[0] = Serial.read();
 
-      // On that Apple, the delete key returns 8, we need to convert 
-      // it to deleteß. 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-      if (inp_serial[0] == 8) inp_serial[0] = 127;
-#endif
+    // Translate to the correct character delete value when the backspace key is pressed
+    if (inp_serial[0] == 8) inp_serial[0] = delete_value;
 
 	  for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
 	    if( iface_socket[i] != INVALID_SOCKET && FD_ISSET(iface_socket[i], &s_rd) )
