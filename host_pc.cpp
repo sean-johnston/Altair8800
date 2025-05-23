@@ -17,7 +17,7 @@
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
 
-#if defined(_WIN32) || defined(__linux__) || defined(__bsd__)|| defined(__APPLE__)
+#if defined(_WIN32) || defined(__linux__) || defined(__FreeBSD__)|| defined(__APPLE__)
 
 #include <time.h>
 #include <string>
@@ -52,6 +52,12 @@
 #if defined(__linux__)
 #include <sys/eventfd.h>
 #endif
+
+#if defined(__FreeBSD__)
+#include <sys/socket.h>
+#endif
+
+#include <pthread.h>
 
 #include <unistd.h>
 typedef int SOCKET;
@@ -597,7 +603,7 @@ static int signalEvent;
 
 // We need to define a socket pair to use the socketpair
 // function instead of eventfd
-#if defined(__bsd__)|| defined(__APPLE__)
+#if defined(__FreeBSD__)|| defined(__APPLE__)
 int sockets[2];
 #endif
 
@@ -670,7 +676,7 @@ void *host_input_thread(void *data)
 
       // On that Apple, the delete key returns 8, we need to convert 
       // it to deleteß. 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
       if (inp_serial[0] == 8) inp_serial[0] = 127;
 #endif
 
@@ -772,7 +778,7 @@ void host_check_interrupts()
 	    
 	    // we have consumed the input => signal input thread to receive more
 	    inp_serial[0] = -1; 
-#if  defined(__bsd__)|| defined(__APPLE__)
+#if  defined(__FreeBSD__)|| defined(__APPLE__)
         // If on Apple or BSD, use the second socket in the
         // socket pair instead of signalEvent
         SignalEvent(sockets[1]); 
@@ -802,7 +808,7 @@ void host_check_interrupts()
           
           // we have consumed the input => signal input thread to receive more
           inp_serial[i] = -1;
-#if  defined(__bsd__)|| defined(__APPLE__)
+#if  defined(__FreeBSD__)|| defined(__APPLE__)
         // If on Apple or BSD, use the second socket in the
         // socket pair instead of signalEvent
         SignalEvent(sockets[1]); 
@@ -1018,7 +1024,7 @@ void host_setup()
   DWORD id; 
   HANDLE h = CreateThread(0, 0, host_input_thread, NULL, 0, &id);
   CloseHandle(h);
-#elif defined(__linux__) || defined(__bsd__)|| defined(__APPLE__)
+#elif defined(__linux__) || defined(__FreeBSD__)|| defined(__APPLE__)
   // handle CTRL-C in sig_handler so only pressing it twice
   // will terminate the simulator (otherwise CTRL-C could not
   // be sent to the emulated program
@@ -1026,7 +1032,7 @@ void host_setup()
 
   // create an event that can be sent to awaken the input thread
 
-#if defined(__bsd__)|| defined(__APPLE__)  
+#if defined(__FreeBSD__)|| defined(__APPLE__)  
 
   // If we are using BSD or Apple, create a socket pair,
   // and copy the first descriptor into signalEvent,

@@ -40,7 +40,7 @@
 #include "vdm1.h"
 #include "io.h"
 
-#if defined(__APPLE__) || defined(__bsd__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #include <ncurses.h>
 #endif
 

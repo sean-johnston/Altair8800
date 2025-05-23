@@ -29,6 +29,7 @@
 #include <string>
 #include <iostream>
 #include <sys/timeb.h>
+#include	<sys/types.h>
 using namespace std;
 
 
