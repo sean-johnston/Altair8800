@@ -925,6 +925,7 @@ void read_inputs_serial()
 #elif NUM_DRIVES==0 && NUM_HDSK_UNITS==0 && NUM_TDRIVES==0
       c = 'c';
 #else
+      Serial.print(F("\0332J"));
       Serial.print(F("\r\nMount "));
 #if NUM_DRIVES>0
       Serial.print(F("(f)loppy "));
@@ -1185,7 +1186,7 @@ void print_panel_serial(bool force)
 
   if( force || p_cswitch != cswitch || p_dswitch != dswitch || p_abus != abus || p_dbus != dbus || p_status != status )
     {
-      Serial.print(F("\033[2J\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
+      Serial.print(F("\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
 
       if( status & ST_INTE  ) Serial.print(F(" *  "));    else Serial.print(F(" .  "));
       if( status & ST_PROT  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
