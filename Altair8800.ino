@@ -817,6 +817,7 @@ void read_inputs_serial()
   else if( data == '?') {
 
     // Display the programs menu
+    Serial.print(F("\033[2J\033[0;0H\n"));
     menu = 1;
     prog_print_dir();
     Serial.print(F("\r\nOption: "));
@@ -844,6 +845,7 @@ void read_inputs_serial()
   }
   else if( data == ' ')
   {
+    Serial.print(F("\033[2J\033[0;0H\n"));
     print_panel_serial(true);
   }
   else if( data == '>' )
@@ -925,7 +927,7 @@ void read_inputs_serial()
 #elif NUM_DRIVES==0 && NUM_HDSK_UNITS==0 && NUM_TDRIVES==0
       c = 'c';
 #else
-      Serial.print(F("\0332J"));
+      Serial.print(F("\033[2J"));
       Serial.print(F("\r\nMount "));
 #if NUM_DRIVES>0
       Serial.print(F("(f)loppy "));
@@ -1333,11 +1335,15 @@ void switch_interrupt_handler()
       host_clr_status_led_WO();
       host_set_status_led_WAIT();
       if( !config_serial_debug_enabled() ) 
-        {}
+      {
+        Serial.print(F("\033[2J\033[0;0H\n"));
+      }
       else if( config_serial_panel_enabled() )
         Serial.print(F("\033[2J\033[14B\r\n------ STOP ------\r\n\n"));
-      else
+      else {
+        Serial.print(F("\033[2J\033[0;0H\n"));
         Serial.print(F("\r\n\n------ STOP ------\r\n\n"));
+      }
       p_regPC = ~regPC;
     }
   else if( altair_interrupts & INT_SW_RESET )
