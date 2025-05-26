@@ -757,16 +757,22 @@ void empty_input_buffer()
 
 uint16_t prog_print_dir();
 extern byte menu;
-
+extern int panel_serial;
 void read_inputs_serial()
 {
   if( !config_serial_input_enabled() )
     return;
-
-  int data = serial_read();
+  int data;
+  if (panel_serial != -1) {
+    data = panel_serial;
+    panel_serial = -1;
+  }
+  else {
+    data = serial_read();
+  }
   if( data<0 )
     return;
-#if STANDALONE>0
+  #if STANDALONE>0
   else if( data >= '0' && data <= '9' )
     dswitch = dswitch ^ (1 << (data - '0'));
   else if( data >= 'a' && data <= 'f' )
@@ -845,8 +851,12 @@ void read_inputs_serial()
   }
   else if( data == ' ')
   {
+    int32_t old_config_flags = config_flags;
+    config_flags |= CF_SERIAL_PANEL;
     Serial.print(F("\033[2J\033[0;0H\n"));
     print_panel_serial(true);
+    config_flags = old_config_flags;
+    Serial.print(F("\033[10B"));
   }
   else if( data == '>' )
     {
@@ -1179,90 +1189,92 @@ void print_panel_serial(bool force)
   static uint16_t p_dswitch = 0, p_cswitch = 0, p_abus = 0xffff, p_dbus = 0xffff, p_status = 0xffff;
   uint16_t status, abus;
 
-  if( !config_serial_panel_enabled() )
-    return;
-
   status = host_read_status_leds();
   abus   = host_read_addr_leds();
   dbus   = host_read_data_leds();
 
   if( force || p_cswitch != cswitch || p_dswitch != dswitch || p_abus != abus || p_dbus != dbus || p_status != status )
     {
-      Serial.print(F("\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
+      host_panel(dswitch, cswitch, status, abus, dbus);
 
-      if( status & ST_INTE  ) Serial.print(F(" *  "));    else Serial.print(F(" .  "));
-      if( status & ST_PROT  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
-      if( status & ST_MEMR  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
-      if( status & ST_INP   ) Serial.print(F("  * "));    else Serial.print(F("  . "));
-      if( status & ST_M1    ) Serial.print(F(" * "));     else Serial.print(F(" . "));
-      if( status & ST_OUT   ) Serial.print(F("  * "));    else Serial.print(F("  . "));
-      if( status & ST_HLTA  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
-      if( status & ST_STACK ) Serial.print(F("   *  "));  else Serial.print(F("   .  "));
-      if( status & ST_WO    ) Serial.print(F(" * "));     else Serial.print(F(" . "));
-      if( status & ST_INT   ) Serial.print(F("  *"));    else Serial.print(F("  ."));
+      if( config_serial_panel_enabled() )
+      {
+        Serial.print(F("\033[s\033[0;0HINTE PROT MEMR INP M1 OUT HLTA STACK WO INT  D7  D6  D5  D4  D3  D2  D1  D0\r\n"));
 
-      if( dbus&0x80 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x40 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x20 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x10 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x08 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x04 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x02 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( dbus&0x01 )   Serial.print(F("   *")); else Serial.print(F("   ."));
-      Serial.print(("\r\nWAIT HLDA   A15 A14 A13 A12 A11 A10  A9  A8  A7  A6  A5  A4  A3  A2  A1  A0\r\n"));
-      if( status & ST_WAIT ) Serial.print(F(" *  "));   else Serial.print(F(" .  "));
-      if( status & ST_HLDA ) Serial.print(F("  *   ")); else Serial.print(F("  .   "));
-      if( abus&0x8000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x4000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x2000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x1000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0800 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0400 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0200 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0100 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0080 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0040 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0020 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0010 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0008 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0004 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0002 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      if( abus&0x0001 ) Serial.print(F("   *")); else Serial.print(F("   ."));
-      Serial.print(F("\r\n            S15 S14 S13 S12 S11 S10 S09 S08 S07 S06 S05 S04 S03 S02 S01 S00"));
-      Serial.print(F("\r\n            (f) (e) (d) (c) (b) (a) (9) (8) (7) (6) (5) (4) (3) (2) (1) (0)\r\n"));
-      Serial.print(F("          "));
-      if( dswitch&0x8000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x4000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x2000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x1000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0800 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0400 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0200 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0100 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0080 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0040 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0020 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0010 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0008 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0004 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0002 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      if( dswitch&0x0001 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
-      Serial.print(F("\r\n            Stop  Step  Examine  Deposit  Reset  Protect   Aux  Aux   "));
+        if( status & ST_INTE  ) Serial.print(F(" *  "));    else Serial.print(F(" .  "));
+        if( status & ST_PROT  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
+        if( status & ST_MEMR  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
+        if( status & ST_INP   ) Serial.print(F("  * "));    else Serial.print(F("  . "));
+        if( status & ST_M1    ) Serial.print(F(" * "));     else Serial.print(F(" . "));
+        if( status & ST_OUT   ) Serial.print(F("  * "));    else Serial.print(F("  . "));
+        if( status & ST_HLTA  ) Serial.print(F("  *  "));   else Serial.print(F("  .  "));
+        if( status & ST_STACK ) Serial.print(F("   *  "));  else Serial.print(F("   .  "));
+        if( status & ST_WO    ) Serial.print(F(" * "));     else Serial.print(F(" . "));
+        if( status & ST_INT   ) Serial.print(F("  *"));    else Serial.print(F("  ."));
 
-      // Show the delete value for the backspace
-      Serial.print(F(delete_str));
+        if( dbus&0x80 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x40 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x20 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x10 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x08 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x04 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x02 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( dbus&0x01 )   Serial.print(F("   *")); else Serial.print(F("   ."));
+        Serial.print(("\r\nWAIT HLDA   A15 A14 A13 A12 A11 A10  A9  A8  A7  A6  A5  A4  A3  A2  A1  A0\r\n"));
+        if( status & ST_WAIT ) Serial.print(F(" *  "));   else Serial.print(F(" .  "));
+        if( status & ST_HLDA ) Serial.print(F("  *   ")); else Serial.print(F("  .   "));
+        if( abus&0x8000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x4000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x2000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x1000 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0800 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0400 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0200 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0100 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0080 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0040 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0020 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0010 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0008 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0004 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0002 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        if( abus&0x0001 ) Serial.print(F("   *")); else Serial.print(F("   ."));
+        Serial.print(F("\r\n            S15 S14 S13 S12 S11 S10 S09 S08 S07 S06 S05 S04 S03 S02 S01 S00"));
+        Serial.print(F("\r\n            (f) (e) (d) (c) (b) (a) (9) (8) (7) (6) (5) (4) (3) (2) (1) (0)\r\n"));
+        Serial.print(F("          "));
+        if( dswitch&0x8000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x4000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x2000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x1000 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0800 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0400 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0200 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0100 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0080 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0040 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0020 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0010 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0008 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0004 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0002 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        if( dswitch&0x0001 ) Serial.print(F("   ^")); else Serial.print(F("   v"));
+        Serial.print(F("\r\n            Stop  Step  Examine  Deposit  Reset  Protect   Aux  Aux   "));
 
-      Serial.print(F("   \r\n"));
-      Serial.print(F("           "));
-      if( cswitch & BIT(SW_STOP) )    Serial.print(F("  ^ "));       else if( cswitch & BIT(SW_RUN) )       Serial.print(F("  v "));      else Serial.print(F("  o "));
-      if( cswitch & BIT(SW_STEP) )    Serial.print(F("    ^ "));     else if( cswitch & BIT(SW_SLOW) )      Serial.print(F("    v "));    else Serial.print(F("    o "));
-      if( cswitch & BIT(SW_EXAMINE) ) Serial.print(F("     ^   "));  else if( cswitch & BIT(SW_EXNEXT) )    Serial.print(F("     v   ")); else Serial.print(F("     o   "));
-      if( cswitch & BIT(SW_DEPOSIT) ) Serial.print(F("     ^   "));  else if( cswitch & BIT(SW_DEPNEXT) )   Serial.print(F("     v   ")); else Serial.print(F("     o   "));
-      if( cswitch & BIT(SW_RESET) )   Serial.print(F("    ^  "));    else if( cswitch & BIT(SW_CLR) )       Serial.print(F("    v  "));   else Serial.print(F("    o  "));
-      if( cswitch & BIT(SW_PROTECT) ) Serial.print(F("      ^  "));  else if( cswitch & BIT(SW_UNPROTECT) ) Serial.print(F("      v  ")); else Serial.print(F("      o  "));
-      if( cswitch & BIT(SW_AUX1UP) )  Serial.print(F("     ^  "));   else if( cswitch & BIT(SW_AUX1DOWN) )  Serial.print(F("     v  "));  else Serial.print(F("     o  "));
-      if( cswitch & BIT(SW_AUX2UP) )  Serial.print(F("  ^  "));      else if( cswitch & BIT(SW_AUX2DOWN) )  Serial.print(F("  v  "));     else Serial.print(F("  o  "));
-      Serial.print(F("\r\n            Run         E.Next   D.Next    CLR   Unprotect\r\n\033[K\n\033[K\n\033[K\n\033[K\n\033[K\033[u"));
+        // Show the delete value for the backspace
+        Serial.print(F(delete_str));
+
+        Serial.print(F("   \r\n"));
+        Serial.print(F("           "));
+        if( cswitch & BIT(SW_STOP) )    Serial.print(F("  ^ "));       else if( cswitch & BIT(SW_RUN) )       Serial.print(F("  v "));      else Serial.print(F("  o "));
+        if( cswitch & BIT(SW_STEP) )    Serial.print(F("    ^ "));     else if( cswitch & BIT(SW_SLOW) )      Serial.print(F("    v "));    else Serial.print(F("    o "));
+        if( cswitch & BIT(SW_EXAMINE) ) Serial.print(F("     ^   "));  else if( cswitch & BIT(SW_EXNEXT) )    Serial.print(F("     v   ")); else Serial.print(F("     o   "));
+        if( cswitch & BIT(SW_DEPOSIT) ) Serial.print(F("     ^   "));  else if( cswitch & BIT(SW_DEPNEXT) )   Serial.print(F("     v   ")); else Serial.print(F("     o   "));
+        if( cswitch & BIT(SW_RESET) )   Serial.print(F("    ^  "));    else if( cswitch & BIT(SW_CLR) )       Serial.print(F("    v  "));   else Serial.print(F("    o  "));
+        if( cswitch & BIT(SW_PROTECT) ) Serial.print(F("      ^  "));  else if( cswitch & BIT(SW_UNPROTECT) ) Serial.print(F("      v  ")); else Serial.print(F("      o  "));
+        if( cswitch & BIT(SW_AUX1UP) )  Serial.print(F("     ^  "));   else if( cswitch & BIT(SW_AUX1DOWN) )  Serial.print(F("     v  "));  else Serial.print(F("     o  "));
+        if( cswitch & BIT(SW_AUX2UP) )  Serial.print(F("  ^  "));      else if( cswitch & BIT(SW_AUX2DOWN) )  Serial.print(F("  v  "));     else Serial.print(F("  o  "));
+        Serial.print(F("\r\n            Run         E.Next   D.Next    CLR   Unprotect\r\n\033[K\n\033[K\n\033[K\n\033[K\n\033[K\033[u"));
+      }
       p_cswitch = cswitch;
       p_dswitch = dswitch;
       p_abus = abus;

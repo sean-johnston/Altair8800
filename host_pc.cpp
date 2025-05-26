@@ -424,8 +424,20 @@ uint32_t host_get_random()
 
 
 static int      inp_serial[HOSTPC_NUM_SOCKET_CONN+1];
+int      panel_serial;
 static uint32_t cycles_per_char[HOSTPC_NUM_SOCKET_CONN+1];
 static SOCKET   iface_socket[HOSTPC_NUM_SOCKET_CONN];
+static SOCKET   panel_socket;
+
+void host_panel(uint16_t dswitch, uint16_t cswitch, uint16_t status, uint16_t abus, byte dbus) {
+  if (panel_socket != INVALID_SOCKET) {
+      char out[100];
+      snprintf(out, 100, "%d,%d,%d,%d,%d\r\n", dswitch, cswitch, status, abus, dbus);
+      printf("%s", out);
+      send(panel_socket,out,strlen(out), 0);  
+  }
+}
+
 
 static SOCKET set_up_listener(const char* pcAddress, int nPort)
 {
@@ -612,129 +624,199 @@ static int signalEvent;
 int sockets[2];
 #endif
 
+void read_inputs_serial();
+
 void *host_input_thread(void *data)
 {
   SOCKET accept_socket = INVALID_SOCKET;
-  fd_set s_rd, s_wr, s_ex;
+  SOCKET accept_socket_2 = INVALID_SOCKET;
+
+  fd_set s_rd, s_wr, s_ex, s_panel_rd, s_panel_wr;
   int i;
 
   // initialize socket for secondary interface
+  accept_socket_2 = set_up_listener("0.0.0.0", htons(8080));
+  if( accept_socket_2 == INVALID_SOCKET )
+    printf("Can not listen on port 8080 => panel not available\r\n");
 #if HOSTPC_NUM_SOCKET_CONN>0
-  accept_socket = set_up_listener("0.0.0.0", htons(8800));
-  if( accept_socket == INVALID_SOCKET )
-    printf("Can not listen on port 8800 => secondary interface not available\r\n");
+    accept_socket = set_up_listener("0.0.0.0", htons(8800));
+    if( accept_socket == INVALID_SOCKET )
+      printf("Can not listen on port 8800 => secondary interface not available\r\n");
 #endif
-
+  
   FD_ZERO(&s_wr);
   FD_ZERO(&s_ex);
   while( 1 )
+  {
+    FD_ZERO(&s_rd);
+
+    int nfds = 0;
+    if( inp_serial[0]<0 )
     {
-      FD_ZERO(&s_rd);
+      // ready to receive more data on console (primary interface)
+      FD_SET(fileno(stdin), &s_rd);
+      if( fileno(stdin)>=nfds ) nfds = fileno(stdin)+1;
+    }
 
-      int nfds = 0;
-      if( inp_serial[0]<0 )
-	{
-          // ready to receive more data on console (primary interface)
-	  FD_SET(fileno(stdin), &s_rd);
-	  if( fileno(stdin)>=nfds ) nfds = fileno(stdin)+1;
-	}
+    if (panel_socket != INVALID_SOCKET)
+    {
+      FD_SET(panel_socket, &s_rd); 
+      if( panel_socket>=nfds ) nfds = panel_socket+1;
+    }
 
-      for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
-	if( iface_socket[i] != INVALID_SOCKET && inp_serial[i+1]<0 )
-	  {
-	    // ready to receive more data on socket
-	    FD_SET(iface_socket[i], &s_rd); 
-	    if( iface_socket[i]>=nfds ) nfds = iface_socket[i]+1;
-	  }
-
-      if( accept_socket != INVALID_SOCKET )
-	{
-          // ready to accept connection on socket
-	  FD_SET(accept_socket, &s_rd); 
-	  if( accept_socket>=nfds ) nfds = accept_socket+1;
-	}
-
-      // adding this allows host_check_interrupts to signal this thread that 
-      // an input has been read and we can accept more inputs now (otherwise
-      // we may get stuck in WSAWaitForMultipleEvents even though more input
-      // is available)
-      FD_SET(signalEvent, &s_rd);
-      if( signalEvent>=nfds ) nfds = signalEvent+1;
-
-      // wait until we either
-      // - get input on console (if we are ready to accept more)
-      // - get input on socket (if we are ready to accept more)
-      // - a new client is connected (if none is connected right now)
-      // - host_check_interrupts has signaled that there was a change in
-      //   whether we are ready to accept more data
-      if( select(nfds, &s_rd, NULL, NULL, NULL) >= 0 )
-        {
-	  if( FD_ISSET(signalEvent, &s_rd) )
+    for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
+	    if( iface_socket[i] != INVALID_SOCKET && inp_serial[i+1]<0 )
 	    {
-	      // clear the signal
-	      byte buf[8]; 
-	      read(signalEvent, buf, 8)==0;
+	      // ready to receive more data on socket
+	      FD_SET(iface_socket[i], &s_rd); 
+	      if( iface_socket[i]>=nfds ) nfds = iface_socket[i]+1;
 	    }
 
-          if( FD_ISSET(fileno(stdin), &s_rd) )
-	    inp_serial[0] = Serial.read();
+    if( accept_socket != INVALID_SOCKET )
+	  {
+      // ready to accept connection on socket
+	    FD_SET(accept_socket, &s_rd); 
+	    if( accept_socket>=nfds ) nfds = accept_socket+1;
+	  }
 
-    // Translate to the correct character delete value when the backspace key is pressed
-    if (inp_serial[0] == 8) inp_serial[0] = delete_value;
+    if( accept_socket_2 != INVALID_SOCKET )
+    {
+            // ready to accept connection on socket
+      FD_SET(accept_socket_2, &s_rd); 
+      if( accept_socket_2>=nfds ) nfds = accept_socket_2+1;
+    }
 
-	  for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
-	    if( iface_socket[i] != INVALID_SOCKET && FD_ISSET(iface_socket[i], &s_rd) )
+    // adding this allows host_check_interrupts to signal this thread that 
+    // an input has been read and we can accept more inputs now (otherwise
+    // we may get stuck in WSAWaitForMultipleEvents even though more input
+    // is available)
+    FD_SET(signalEvent, &s_rd);
+    if( signalEvent>=nfds ) nfds = signalEvent+1;
+
+    // wait until we either
+    // - get input on console (if we are ready to accept more)
+    // - get input on socket (if we are ready to accept more)
+    // - a new client is connected (if none is connected right now)
+    // - host_check_interrupts has signaled that there was a change in
+    //   whether we are ready to accept more data
+    if( select(nfds, &s_rd, NULL, NULL, NULL) >= 0 )
+    {
+      if( FD_ISSET(signalEvent, &s_rd) )
+      {
+        // clear the signal
+        byte buf[8]; 
+        read(signalEvent, buf, 8)==0;
+      }
+
+      if( FD_ISSET(fileno(stdin), &s_rd) )
+  	    inp_serial[0] = Serial.read();
+
+      // Translate to the correct character delete value when the backspace key is pressed
+      if (inp_serial[0] == 8) inp_serial[0] = delete_value;
+
+  	  for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
+	      if( iface_socket[i] != INVALID_SOCKET && FD_ISSET(iface_socket[i], &s_rd) )
+        {
+          char c;
+          if( recv(iface_socket[i], &c, 1, MSG_NOSIGNAL)==0 )
             {
-              char c;
-              if( recv(iface_socket[i], &c, 1, MSG_NOSIGNAL)==0 )
-                {
-                  // no input => connection was dropped
-                  iface_socket[i] = INVALID_SOCKET;
-                  inp_serial[i+1] = -1;
-                }
-              else
-                {
-                  // received input on socket
-		  //printf("Received %02X on serial #%i\r\n", (byte) c, i+1);
-                  inp_serial[i+1] = (byte) c;
-                }
+              // no input => connection was dropped
+              iface_socket[i] = INVALID_SOCKET;
+              inp_serial[i+1] = -1;
             }
-
-	  if( accept_socket != INVALID_SOCKET && FD_ISSET(accept_socket, &s_rd) )
+          else
             {
-              sockaddr_in sinRemote;
-              socklen_t nAddrSize = sizeof(sinRemote);
-
-	      for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
-		if( iface_socket[i]==INVALID_SOCKET )
-		  break;
-
-	      if( i<HOSTPC_NUM_SOCKET_CONN )
-		{
-		  // accept a new connection
-		  iface_socket[i] = accept(accept_socket, (sockaddr*)&sinRemote, &nAddrSize);
-		  if( iface_socket[i]!=INVALID_SOCKET )
-		    {
-		      // make a connected telnet client enter CHAR mode
-		      //write(iface_socket[i],"\377\375\042\377\373\001",6)==0;
-		      const char *s = "[Connected as: ";
-		      send(iface_socket[i],s,strlen(s), 0);
-		      s = host_serial_port_name(i+1);
-		      send(iface_socket[i],s,strlen(s), 0);
-		      s = "]\r\n";
-		      send(iface_socket[i],s,strlen(s), 0);
-		    }
-		}
-              else
-                {
-                  SOCKET s = accept(accept_socket, (sockaddr*)&sinRemote, &nAddrSize);
-                  const char *msg = "[Too many client connections]";
-                  send(s,msg,strlen(msg), 0);
-                  shutdown(s, 2);
-                }
+              // received input on socket
+              //printf("Received %02X on serial #%i\r\n", (byte) c, i+1);
+              inp_serial[i+1] = (byte) c;
             }
         }
+
+        if( accept_socket != INVALID_SOCKET && FD_ISSET(accept_socket, &s_rd) )
+        {
+          sockaddr_in sinRemote;
+          socklen_t nAddrSize = sizeof(sinRemote);
+
+          for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
+            if( iface_socket[i]==INVALID_SOCKET )
+              break;
+
+          if( i<HOSTPC_NUM_SOCKET_CONN )
+          {
+            // accept a new connection
+            iface_socket[i] = accept(accept_socket, (sockaddr*)&sinRemote, &nAddrSize);
+            if( iface_socket[i]!=INVALID_SOCKET )
+            {
+              // make a connected telnet client enter CHAR mode
+              //write(iface_socket[i],"\377\375\042\377\373\001",6)==0;
+              const char *s = "[Connected as: ";
+              send(iface_socket[i],s,strlen(s), 0);
+              s = host_serial_port_name(i+1);
+              send(iface_socket[i],s,strlen(s), 0);
+              s = "]\r\n";
+              send(iface_socket[i],s,strlen(s), 0);
+            }
+          }
+          else
+          {
+            SOCKET s = accept(accept_socket, (sockaddr*)&sinRemote, &nAddrSize);
+            const char *msg = "[Too many client connections]";
+            send(s,msg,strlen(msg), 0);
+            shutdown(s, 2);
+          }
+        }
+
+      if( panel_socket != INVALID_SOCKET && FD_ISSET(panel_socket, &s_rd) )
+      {
+        char c;
+        if( recv(panel_socket, &c, 1, MSG_NOSIGNAL)==0 )
+          {
+            // no input => connection was dropped
+            panel_socket = INVALID_SOCKET;
+            panel_serial = -1;
+          }
+        else
+          {
+            // received input on socket
+            printf("Received %02X (%c) on serial #%i\r\n", (byte) c, (byte) c, i+1);
+            panel_serial = (byte) c;
+          }
+      }
+
+      if( accept_socket_2 != INVALID_SOCKET && FD_ISSET(accept_socket_2, &s_rd) )
+      {
+        sockaddr_in sinRemote;
+        socklen_t nAddrSize = sizeof(sinRemote);
+
+        //if( panel_socket==INVALID_SOCKET )
+        //  break;
+
+        if( panel_socket == INVALID_SOCKET )
+        {
+          // accept a new connection
+          panel_socket = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
+          if( panel_socket!=INVALID_SOCKET )
+          {
+            // make a connected telnet client enter CHAR mode
+            //write(iface_socket[i],"\377\375\042\377\373\001",6)==0;
+            //const char *s = "[Connected as: ";
+            //send(panel_socket,s,strlen(s), 0);
+            //s = "panel_socket";
+            //send(panel_socket,s,strlen(s), 0);
+            //s = "]\r\n";
+            //send(panel_socket,s,strlen(s), 0);
+          }
+        }
+        else
+        {
+          SOCKET s = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
+          const char *msg = "[Too many client connections]";
+          send(s,msg,strlen(msg), 0);
+          shutdown(s, 2);
+        }
+      }
     }
+  }
 
   return NULL;
 }
@@ -1007,6 +1089,7 @@ void host_setup()
       iface_socket[i] = INVALID_SOCKET;
       inp_serial[i+1] = -1;
     }
+  panel_socket = INVALID_SOCKET;
 
 #if defined(_WIN32)
   // send CTRL-C to input instead of processing it (otherwise the

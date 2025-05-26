@@ -4,8 +4,8 @@ ifeq ($(OSTYPE),msys)
   OBJ=obj-msys
   EXT=.exe
 else
-  CFLAGS=-O3
-  LFLAGS=-O3 -lncurses -lpthread -lutil
+  CFLAGS=-g
+  LFLAGS=-g -lncurses -lpthread -lutil
   OBJ=obj-linux
   EXT=
 endif

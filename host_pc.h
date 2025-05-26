@@ -111,6 +111,7 @@ uint16_t host_read_addr_switches();
 void host_check_interrupts();
 void host_serial_interrupts_pause();
 void host_serial_interrupts_resume();
+void host_panel(uint16_t dswitch, uint16_t cswitch, uint16_t status, uint16_t abus, byte dbus);
 
 // external bus I/O not supported on this platform
 #define host_read_status_WAIT() 0

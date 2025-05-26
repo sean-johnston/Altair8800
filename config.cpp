@@ -1435,7 +1435,7 @@ static bool apply_host_serial_settings()
           if( millis()>timeout2 )
             {
               Serial.print(F("\r\nKeep new host interface settings (y/n)? "));
-              timeout2 = millis() + 2000;
+              timeout2 = millis() + 20000;
             }
 
           delay(50);
@@ -1443,7 +1443,7 @@ static bool apply_host_serial_settings()
         }
       while( c!='y' && c!='n' && millis()<timeout );
       Serial.println(c);
-      if( c!='y' )
+      /*if( c!='y' )
         { 
           dazzler_set_iface(old_dazzler_interface);
           vdm1_set_iface(old_vdm1_interface);
@@ -1459,6 +1459,7 @@ static bool apply_host_serial_settings()
             }
           return false;
         }
+          */
     }
 
   return true;
