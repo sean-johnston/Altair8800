@@ -113,6 +113,8 @@ void host_serial_interrupts_pause();
 void host_serial_interrupts_resume();
 void host_panel(uint16_t dswitch, uint16_t cswitch, uint16_t status, uint16_t abus, byte dbus);
 
+extern int panel_serial;
+
 // external bus I/O not supported on this platform
 #define host_read_status_WAIT() 0
 #define host_read_data_bus()    0xFF

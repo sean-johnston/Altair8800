@@ -433,7 +433,9 @@ void host_panel(uint16_t dswitch, uint16_t cswitch, uint16_t status, uint16_t ab
   if (panel_socket != INVALID_SOCKET) {
       char out[100];
       snprintf(out, 100, "%d,%d,%d,%d,%d\r\n", dswitch, cswitch, status, abus, dbus);
+#if DEBUG
       printf("%s", out);
+#endif
       send(panel_socket,out,strlen(out), 0);  
   }
 }
@@ -625,6 +627,7 @@ int sockets[2];
 #endif
 
 void read_inputs_serial();
+void print_panel_serial(bool force);
 
 void *host_input_thread(void *data)
 {
@@ -727,7 +730,9 @@ void *host_input_thread(void *data)
           else
             {
               // received input on socket
-              //printf("Received %02X on serial #%i\r\n", (byte) c, i+1);
+#if DEBUG
+              printf("Received %02X on serial #%i\r\n", (byte) c, i+1);
+#endif
               inp_serial[i+1] = (byte) c;
             }
         }
@@ -774,12 +779,18 @@ void *host_input_thread(void *data)
             // no input => connection was dropped
             panel_socket = INVALID_SOCKET;
             panel_serial = -1;
+            printf("Panel Disconnected!\r\n");
           }
         else
           {
             // received input on socket
+#if DEBUG
             printf("Received %02X (%c) on serial #%i\r\n", (byte) c, (byte) c, i+1);
+#endif
             panel_serial = (byte) c;
+
+            // Initiate Stop
+            if (c == 27) altair_hlt();
           }
       }
 
@@ -788,17 +799,15 @@ void *host_input_thread(void *data)
         sockaddr_in sinRemote;
         socklen_t nAddrSize = sizeof(sinRemote);
 
-        //if( panel_socket==INVALID_SOCKET )
-        //  break;
-
         if( panel_socket == INVALID_SOCKET )
         {
           // accept a new connection
           panel_socket = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
           if( panel_socket!=INVALID_SOCKET )
           {
-            // make a connected telnet client enter CHAR mode
-            //write(iface_socket[i],"\377\375\042\377\373\001",6)==0;
+            print_panel_serial(true);
+            printf("Panel Connected!\r\n");
+            // Connect to the simulator to update the panel
             //const char *s = "[Connected as: ";
             //send(panel_socket,s,strlen(s), 0);
             //s = "panel_socket";
@@ -810,8 +819,8 @@ void *host_input_thread(void *data)
         else
         {
           SOCKET s = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
-          const char *msg = "[Too many client connections]";
-          send(s,msg,strlen(msg), 0);
+          //const char *msg = "[Too many client connections]";
+          //send(s,msg,strlen(msg), 0);
           shutdown(s, 2);
         }
       }

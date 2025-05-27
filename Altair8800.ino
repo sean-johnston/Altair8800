@@ -757,12 +757,14 @@ void empty_input_buffer()
 
 uint16_t prog_print_dir();
 extern byte menu;
-extern int panel_serial;
 void read_inputs_serial()
 {
   if( !config_serial_input_enabled() )
     return;
   int data;
+
+#if defined(_WIN32) || defined(__linux__) || defined(__FreeBSD__)|| defined(__APPLE__)
+  // Needed for the Altair Panel
   if (panel_serial != -1) {
     data = panel_serial;
     panel_serial = -1;
@@ -770,6 +772,9 @@ void read_inputs_serial()
   else {
     data = serial_read();
   }
+  #else
+    data = serial_read();
+  #endif
   if( data<0 )
     return;
   #if STANDALONE>0
