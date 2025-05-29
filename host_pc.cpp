@@ -473,10 +473,15 @@ static SOCKET set_up_listener(const char* pcAddress, int nPort)
 
 static HANDLE signalEvent;
 
+void read_inputs_serial();
+void print_panel_serial(bool force);
+
 DWORD WINAPI host_input_thread(void *data)
 {
   WSAEVENT eventHandles[6], socket_accept_event, socket_read_event[HOSTPC_NUM_SOCKET_CONN];
+  WSAEVENT socket_accept_event_2, socket_read_event_2;
   SOCKET accept_socket = INVALID_SOCKET;
+  SOCKET accept_socket_2 = INVALID_SOCKET;
 
   // initialize socket for secondary interface
   WSADATA wsaData;
@@ -492,7 +497,16 @@ DWORD WINAPI host_input_thread(void *data)
       for(int i=0; i<HOSTPC_NUM_SOCKET_CONN; i++) socket_read_event[i] = WSACreateEvent();
     }
 #endif
-  
+  accept_socket_2 = set_up_listener("127.0.0.1", htons(8080));
+  if (accept_socket_2 == INVALID_SOCKET)
+      printf("Can not listen on port 8020 => secondary interface not available\n");
+  else
+  {
+      socket_accept_event_2 = WSACreateEvent();
+      WSAEventSelect(accept_socket_2, socket_accept_event_2, FD_ACCEPT);
+      socket_read_event_2 = WSACreateEvent();
+  }
+
   // initialize stdin handle
   HANDLE stdIn = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -508,6 +522,8 @@ DWORD WINAPI host_input_thread(void *data)
 
      if( accept_socket != INVALID_SOCKET )
        eventHandles[n++] = socket_accept_event; 
+     if (accept_socket_2 != INVALID_SOCKET)
+         eventHandles[n++] = socket_accept_event_2;
 
       for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
         if( iface_socket[i] != INVALID_SOCKET && inp_serial[i+1]<0 )
@@ -515,6 +531,12 @@ DWORD WINAPI host_input_thread(void *data)
             // ready to receive more data on this socket
             eventHandles[n++] = socket_read_event[i]; 
           }
+
+      if (panel_socket != INVALID_SOCKET && panel_serial < 0)
+      {
+          // ready to receive more data on this socket
+          eventHandles[n++] = socket_read_event_2;
+      }
 
       // adding this allows host_check_interrupts to signal this thread that 
       // an input has been read and we can accept more inputs now (otherwise
@@ -546,7 +568,7 @@ DWORD WINAPI host_input_thread(void *data)
                   // some sort of other events => clear it from the queue
                   INPUT_RECORD r;
                   DWORD read;
-                  ReadConsoleInput(stdIn, &r, 1, &read);
++                  ReadConsoleInput(stdIn, &r, 1, &read);
                 }
             }
           else if( eventHandles[result] == socket_accept_event )
@@ -584,6 +606,39 @@ DWORD WINAPI host_input_thread(void *data)
               
               WSAResetEvent(socket_accept_event);
             }
+          else if (eventHandles[result] == socket_accept_event_2)
+          {
+              sockaddr_in sinRemote;
+              socklen_t nAddrSize = sizeof(sinRemote);
+
+              if (panel_socket == INVALID_SOCKET)
+              {
+                  panel_socket = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
+                  if (panel_socket != INVALID_SOCKET)
+                  {
+                      print_panel_serial(true);
+                      printf("Panel Connected!\r\n");
+                      //const char* s = "[Connected as: panel_socket";
+                      //send(panel_socket, s, strlen(s), 0);
+                      //s = host_serial_port_name(i + 1);
+                      //send(panel_socket, s, strlen(s), 0);
+                      //s = "]\r\n";
+                      //send(panel_socket, s, strlen(s), 0);
+
+                      WSAResetEvent(socket_read_event_2);
+                      WSAEventSelect(panel_socket, socket_read_event_2, FD_READ | FD_CLOSE);
+                  }
+              }
+              else
+              {
+                  SOCKET s = accept(accept_socket_2, (sockaddr*)&sinRemote, &nAddrSize);
+                  const char* msg = "[Too many client connections]";
+                  send(s, msg, strlen(msg), 0);
+                  shutdown(s, 2);
+              }
+
+              WSAResetEvent(socket_accept_event_2);
+          }
           else
             {
               for(i=0; i<HOSTPC_NUM_SOCKET_CONN; i++)
@@ -609,6 +664,33 @@ DWORD WINAPI host_input_thread(void *data)
                         if( ioctlsocket(iface_socket[i], FIONREAD, &n)==0 && n==0 ) WSAResetEvent(socket_read_event[i]);
                       }
                   }
+
+
+              if (eventHandles[result] == socket_read_event_2)
+              {
+                  // either input or connection drop
+                  char c;
+                  if (recv(panel_socket, &c, 1, 0) == 0)
+                  {
+                      // no input => connection was dropped
+                      panel_socket = INVALID_SOCKET;
+                      panel_serial = -1;
+                      printf("Disconnected serial #%i\n", i + 2);
+                  }
+                  else
+                  {
+                      // received input on socket
+                      DWORD n;
+                      panel_serial = (byte)c;
+                      //printf("Received %i on serial # panel_socket\n", c);
+
+                      // if no more data to read then reset the event
+                      if (ioctlsocket(panel_socket, FIONREAD, &n) == 0 && n == 0)
+                          WSAResetEvent(socket_read_event_2);
+                  }
+
+              }
+
             }
         }
     }
@@ -911,6 +993,18 @@ void host_check_interrupts()
           
           prev_char_cycles[i] = timer_get_cycles();
         }
+  if (panel_serial >= 0)
+
+      // we have consumed the input => signal input thread to receive more
+      panel_serial = -1;
+#if  defined(__FreeBSD__)|| defined(__APPLE__)
+  // If on Apple or BSD, use the second socket in the
+  // socket pair instead of signalEvent
+  SignalEvent(sockets[1]);
+#else 
+  SignalEvent(signalEvent);
+#endif
+
 }
 
 void host_serial_interrupts_pause()
