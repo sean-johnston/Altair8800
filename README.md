@@ -48,3 +48,6 @@ MacOS runs under BSD Unix, so it was a small step to make it work with FreeBSD.
 Compiling is a little different. You need to install g++ and gmake. Once these
 are install you can compile the code with **gmake** instead of **make**.
 
+* Changed the serial panel to include what key to press for toggling the data 
+switches.
+
