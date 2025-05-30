@@ -499,7 +499,7 @@ DWORD WINAPI host_input_thread(void *data)
 #endif
   accept_socket_2 = set_up_listener("127.0.0.1", htons(8801));
   if (accept_socket_2 == INVALID_SOCKET)
-      printf("Can not listen on port 8020 => secondary interface not available\n");
+      printf("Can not listen on port 8801 => secondary interface not available\n");
   else
   {
       socket_accept_event_2 = WSACreateEvent();
@@ -722,7 +722,7 @@ void *host_input_thread(void *data)
   // initialize socket for secondary interface
   accept_socket_2 = set_up_listener("0.0.0.0", htons(8801));
   if( accept_socket_2 == INVALID_SOCKET )
-    printf("Can not listen on port 8080 => panel not available\r\n");
+    printf("Can not listen on port 8801 => panel not available\r\n");
 #if HOSTPC_NUM_SOCKET_CONN>0
     accept_socket = set_up_listener("0.0.0.0", htons(8800));
     if( accept_socket == INVALID_SOCKET )
