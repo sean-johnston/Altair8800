@@ -1200,7 +1200,9 @@ void print_panel_serial(bool force)
 
   if( force || p_cswitch != cswitch || p_dswitch != dswitch || p_abus != abus || p_dbus != dbus || p_status != status )
     {
+#if defined(_WIN32) || defined(__linux__) || defined(__FreeBSD__)|| defined(__APPLE__)
       host_panel(dswitch, delete_value, status, abus, dbus);
+#endif
 
       if( config_serial_panel_enabled() )
       {
